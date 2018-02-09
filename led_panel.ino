@@ -1,6 +1,8 @@
-#include <Wire.h>
-#include <attiny_pwm.h>
+//#define DEBUG
 
+
+#include <Wire.h>
+#include <Adafruit_PWMServoDriver.h>
 #ifdef DEBUG
 #include <SoftwareSerial.h>
 SoftwareSerial mySerial(11, 5); // RX, TX
@@ -14,15 +16,15 @@ SoftwareSerial mySerial(11, 5); // RX, TX
 #define sampleInterval 30
 #define sampleRate 10
 unsigned long previousReadMillis;
-static byte channels[NUM_OUTS] = { A0, A1, A2, A3, A7, A8 };
+static uint8_t channels[NUM_OUTS] = { A0, A1, A2, A3, A7, A8 };
 unsigned short sensorBaseAverages[NUM_OUTS];
 unsigned short sensorMax[NUM_OUTS];
 unsigned short sensor[NUM_OUTS];
 short readIn;
 
 //PWM driver setup
-attiny_pwm pwm = attiny_pwm();
-#define lightInterval 30
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+#define lightInterval 5
 unsigned long previousLightMillis;
 byte sensorState[NUM_OUTS];
 unsigned short lightFade[NUM_OUTS];
@@ -33,8 +35,8 @@ void setup() {
   mySerial.begin(9600);
 #endif
   setupPWM();
-
   calibrateSensors();
+  test();
 }
 
 void loop() {
@@ -51,7 +53,6 @@ void loop() {
   if (timeMillis - previousLightMillis > lightInterval) {
     previousLightMillis = timeMillis;
     lightAnimation();
-
   }
 
 }
@@ -64,9 +65,14 @@ void readSensors() {
     if (readIn > sensorMax[chan]) {
       sensorMax[chan] = readIn;
     }
-    //map the read in from 0 - 1023 to 0 - 4095
-    sensor[chan] = readIn * 4;
+    sensor[chan] = readIn;
+#ifdef DEBUG
+    mySerial.print(chan);
+    mySerial.print(": ");
+    mySerial.println(sensor[chan]);
+#endif
   }
+
 }
 
 void calibrateSensors() {
@@ -76,14 +82,14 @@ void calibrateSensors() {
       delay(20);
     }
     sensorBaseAverages[i] = (sensorBaseAverages[i] / 10) ;
-    sensorMax[i] = 900;
+    sensorMax[i] = sensorBaseAverages[i]+300;
   }
 }
 
 void setupPWM() {
   pwm.begin();
-  pwm.setPWMFreq(1600);  // This is the maximum PWM frequency
-  Wire.setClock(400000);
+  pwm.setPWMFreq(1200);  // This is the maximum PWM frequency
+  Wire.setClock(100000);
 }
 
 void lightStates() {
@@ -92,7 +98,8 @@ void lightStates() {
     if (sensor[i] > sensorBaseAverages[i] + sensorThreshold && sensorState[i] == 0) {
       sensorState[i] = 1;
       //map the sensor value from base to
-      lightFade[i] = map(sensor[i], sensorBaseAverages[i], sensorMax[i], 0, 4095);
+     // lightFade[i] = map(sensor[i], sensorBaseAverages[i], sensorMax[i], 0, 4095);
+     lightFade[i] = 2000;
     }
     //sensor touched
     if (sensor[i] < sensorBaseAverages[i] + sensorThreshold && sensorState[i] == 1) {
@@ -107,24 +114,42 @@ void lightAnimation() {
     switch (sensorState[i]) {
       case 0:
         //light not touched
-        pwm.setPin(i, 0, false);
+        pwm.setPin(i * 2, 0, false);
+        pwm.setPin(i * 2 + 1 , 0, false);
         break;
       case 1:
         //light touching
-        pwm.setPin(i, lightFade[i], false);
+        pwm.setPin(i * 2 , lightFade[i], false);
+        pwm.setPin(i * 2 + 1, lightFade[i], false);
         break;
       case 2:
         //begin light animations
-        if (lightFade[i] > 0) {
-          lightFade[i]--;
+        if (lightFade[i] > 19) {
+          lightFade[i] = lightFade[i] - 20;
+          pwm.setPin(i * 2 + 1 , lightFade[i], false);
+          pwm.setPin(i * 2, lightFade[i], false);
         }
-        if (lightFade[i] == 0) {
+        if (lightFade[i] < 20) {
+          lightFade[i] = 0;
           sensorState[i] = 0;
+          pwm.setPin(i * 2 + 1 , 0, false);
+          pwm.setPin(i * 2, 0, false);
         }
-        pwm.setPin(i, lightFade[i], false);
         break;
     }
   }
 
+}
+
+void test() {
+  for (byte i = 0 ; i < 12; i++) {
+    pwm.setPin(i, 500, false);
+    delay(100);
+  }
+  for (byte i = 0 ; i < 12; i++) {
+    pwm.setPin(i, 0, false);
+    delay(100);
+  }
+  pwm.setPin(0, 0, false);
 }
 
