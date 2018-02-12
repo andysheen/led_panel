@@ -10,9 +10,12 @@ SoftwareSerial mySerial(11, 5); // RX, TX
 
 #define NUM_OUTS  6
 
+//Analog MUX setup
+static uint8_t control_pin[4] = {10, 11, 12, 13};
+#define SIG_PIN A8
 
 //IR sensor setup
-#define sensorThreshold 10
+#define sensorThreshold 20
 #define sampleInterval 30
 #define sampleRate 10
 unsigned long previousReadMillis;
@@ -82,11 +85,12 @@ void calibrateSensors() {
       delay(20);
     }
     sensorBaseAverages[i] = (sensorBaseAverages[i] / 10) ;
-    sensorMax[i] = sensorBaseAverages[i]+300;
+    sensorMax[i] = sensorBaseAverages[i] + 400;
   }
 }
 
 void setupPWM() {
+  delay(100);
   pwm.begin();
   pwm.setPWMFreq(1200);  // This is the maximum PWM frequency
   Wire.setClock(100000);
@@ -95,14 +99,16 @@ void setupPWM() {
 void lightStates() {
   for (byte i = 0; i < NUM_OUTS; i++) {
     //sensor touching
-    if (sensor[i] > sensorBaseAverages[i] + sensorThreshold && sensorState[i] == 0) {
+    // if (sensor[i] > sensorBaseAverages[i] + sensorThreshold && sensorState[i] == 0) {
+    if (sensor[i] > sensorBaseAverages[i] + (sensorBaseAverages[i] / 10) && sensorState[i] == 0) {
       sensorState[i] = 1;
       //map the sensor value from base to
-     // lightFade[i] = map(sensor[i], sensorBaseAverages[i], sensorMax[i], 0, 4095);
-     lightFade[i] = 2000;
+      // lightFade[i] = map(sensor[i], sensorBaseAverages[i], sensorMax[i], 0, 4095);
+      lightFade[i] = 2000;
     }
     //sensor touched
-    if (sensor[i] < sensorBaseAverages[i] + sensorThreshold && sensorState[i] == 1) {
+    // if (sensor[i] < sensorBaseAverages[i] + sensorThreshold && sensorState[i] == 1) {
+    if (sensor[i] < sensorBaseAverages[i] + (sensorBaseAverages[i] / 10) && sensorState[i] == 1) {
       sensorState[i] = 2;
     }
   }
@@ -142,6 +148,7 @@ void lightAnimation() {
 }
 
 void test() {
+  delay(50);
   for (byte i = 0 ; i < 12; i++) {
     pwm.setPin(i, 500, false);
     delay(100);
@@ -151,5 +158,21 @@ void test() {
     delay(100);
   }
   pwm.setPin(0, 0, false);
+}
+
+void setupMUX() {
+  for (uint8_t i = 0; i < 4; i++) {
+    pinMode(control_pin[i], OUTPUT);
+  }
+  pinMode(SIG_PIN, INPUT);
+}
+
+void setChannel(int8_t pin) {
+  for (uint8_t i = 0; i < 4; ++i)
+  {
+    digitalWrite(control_pin[i], pin & 0x01);
+    pin >>= 1;
+  }
+
 }
 
