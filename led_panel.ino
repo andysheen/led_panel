@@ -15,11 +15,12 @@ static uint8_t control_pin[4] = {10, 11, 12, 13};
 #define SIG_PIN A8
 
 //IR sensor setup
-#define sensorThreshold 20
+#define sensorThreshold 10
 #define sampleInterval 30
-#define sampleRate 10
+#define sampleRate 20
 unsigned long previousReadMillis;
 static uint8_t channels[NUM_OUTS] = { A0, A1, A2, A3, A7, A8 };
+//static uint8_t readChannel = A0;
 unsigned short sensorBaseAverages[NUM_OUTS];
 unsigned short sensorMax[NUM_OUTS];
 unsigned short sensor[NUM_OUTS];
@@ -63,6 +64,8 @@ void loop() {
 
 void readSensors() {
   for (uint8_t chan = 0; chan < NUM_OUTS; chan++) {
+    // setChannel(chan);
+    // readIn = analogRead(readChannel);
     readIn = analogRead(channels[chan]);
     //set max for channel
     if (readIn > sensorMax[chan]) {
@@ -82,9 +85,9 @@ void calibrateSensors() {
   for (byte i = 0; i < NUM_OUTS; i++) {
     for (byte j = 0; j < sampleRate; j++) {
       sensorBaseAverages[i] = sensorBaseAverages[i] + analogRead(channels[i]);
-      delay(20);
+      delay(30);
     }
-    sensorBaseAverages[i] = (sensorBaseAverages[i] / 10) ;
+    sensorBaseAverages[i] = (sensorBaseAverages[i] / sampleRate) ;
     sensorMax[i] = sensorBaseAverages[i] + 400;
   }
 }
